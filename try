@@ -22,17 +22,18 @@ int main(void) {
 }
 
 /*
-unsigned short sum = 0;   
-    unsigned short tempNum = 0;   
-    unsigned short headCheckSum = 0;  
-  
-    //计算checksum  
-    for (int i = 0; i < 10; i++){  
-        tempNum = ((unsigned char)IPBuffer[i*2]<<8) + (unsigned char)IPBuffer[i*2 + 1];  
-        if (0xffff - sum < tempNum)  
-            sum = sum + tempNum + 1;  
-        else  
-            sum = sum + tempNum;  
-    }  
-    headCheckSum = htons(0xffff - sum); 
+	unsigned short sum =0;
+	unsigned short temp =0;
+	unsigned short checkSum =0;
+	for(int i=0;i<10;i++){
+	temp =((unsigned char)buffer[2*i]<<8)+(unsigned char)buffer[2*i+1];
+	if(0xffff - sum <temp){
+		sum = temp +1+sum;
+	}else{sum = sum+ temp;}
+	}
+	checkSum = htons(0xffff-sum);
+	printf("checksum:%x\n",checkSum);
+	memcpy(buffer + 10, &checkSum, 2); 
+	memcpy(buffer + 20, pBuffer, len);//connet the fomal data
+	ip_SendtoLower(pBuffer,len+20);
 */
