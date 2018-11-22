@@ -1,0 +1,53 @@
+/*
+* THIS FILE IS FOR IP TEST
+*/
+// system support
+#include "sysInclude.h"
+extern void ip_DiscardPkt(char* pBuffer,int type);
+
+extern void ip_SendtoLower(char*pBuffer,int length);
+
+extern void ip_SendtoUp(char *pBuffer,int length);
+
+extern unsigned int getIpv4Address();
+
+// implemented by students
+
+int stud_ip_recv(char *pBuffer,unsigned short length)
+{	int version = pBuffer[0]>>4;
+	int headLength = pBuffer[0] &0xF;
+	int TTL = pBuffer[8];
+      int destAddress = ntohl(*(pBuffer + 16));  
+	if (version != 4){  //Version==4
+      	ip_DiscardPkt(pBuffer, STUD_IP_TEST_VERSION_ERROR);  
+      	return 1;  
+    	}  
+	if(TTL<=0){
+		ip_DiscardPkt(pBuffer, STUD_IP_TEST_TTL_ERROR); 
+		return 1;
+	}
+	if(headLength<5){
+		ip_DiscardPkt(pBuffer, STUD_IP_TEST_HEADLEN_ERROR); 
+		return 1;
+	}
+	if(destAddress!=getIpv4Address()){
+		//check broadcast address
+		ip_DiscardPkt(pBuffer, STUD_IP_TEST_DESTINATION_ERROR);
+		return 1;
+	}
+
+	int i ;
+	int sum = 0;
+	for (i = 0;i<=(headLength*2-1)*2;i=i+2){
+		sum = sum+((unsigned char)pBuffer[i]<<8)+(unsigned char)pBuffer[i+1];
+	}
+	if (sum > 0xFFFF){
+		sum = (0xFFFF & sum) + (sum>>16);
+	}
+	if (sum != 0xffff){  
+        ip_DiscardPkt(pBuffer, STUD_IP_TEST_CHECKSUM_ERROR);  
+        return 1;  
+    	}
+	ip_SendtoUp(pBuffer,length);   
+    	return 0;
+}
