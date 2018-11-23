@@ -19,6 +19,7 @@ int stud_fwd_deal(char *pBuffer, int length);
 typedef struct node  {
 	int dstAddr;
 	int nextAddr;
+	int mask;
 }Node;
 int number = 50;
 int id;
