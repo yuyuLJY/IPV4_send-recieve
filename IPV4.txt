@@ -10,8 +10,25 @@ extern void ip_SendtoLower(char*pBuffer,int length);
 extern void ip_SendtoUp(char *pBuffer,int length);
 
 extern unsigned int getIpv4Address();
+int countChecksum(char *buffer);
 
 // implemented by students
+
+int countChecksum(char *buffer){
+	int sum = 0;
+	int i;
+	for (i = 0;i<=(5*2-1)*2;i=i+2){
+		//printf("---front%d:%x\n",i,(unsigned char)(buffer[i] ));
+		//printf("---back%d:%x\n",i+1,(unsigned char)(buffer[i+1]));
+		sum = sum+((unsigned char)buffer[i]<<8)+(unsigned char)buffer[i+1];
+		printf("当前sum:%x\n",sum);
+	}
+	if (sum >= 0xFFFF){
+		printf("yichu");
+		sum = (0xFFFF & sum) + (sum>>16);
+	}
+	return sum;
+}
 
 int stud_ip_recv(char *pBuffer,unsigned short length)
 {	printf("start-----------\n");
