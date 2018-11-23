@@ -1,39 +1,121 @@
-#include <stdio.h>
-#include<string.h>
-int main(void) { 
- char a[] = {0x45,0x00 ,0x00, 0x14, 0x00, 0x00, 0x00, 0x00 ,0x40, 0x06,0x00, 0xBC,
-    0x0A, 0x00, 0x00, 0x01, 0x0A, 0x00, 0x00, 0x03};
-    char *pBuffer = a;
-	int i ;
-	int sum = 0;
-	for (i = 0;i<=(5*2-1)*2;i=i+2){
-		sum = sum+((unsigned char)pBuffer[i]<<8)+(unsigned char)pBuffer[i+1];
-		printf("当前sum:%x\n",sum);
-	}
-	if (sum >= 0xFFFF){
-		sum = (0xFFFF & sum) + (sum>>16);
-	}
-	if (sum != 0xffff){ 
-	    printf("不是正确的校验和\n");
-	}else{
-	    printf("校验和正确。输出结果：%x\n",sum);
-	}
-	return 0;
+/*
+* THIS FILE IS FOR IP TEST
+*/
+// system support
+#include "sysInclude.h"
+
+extern void ip_DiscardPkt(char* pBuffer,int type);
+
+extern void ip_SendtoLower(char*pBuffer,int length);
+
+extern void ip_SendtoUp(char *pBuffer,int length);
+extern void fwd_SendtoLower(char *pBuffer, int length, unsigned int nexthop); 
+extern unsigned int getIpv4Address();
+int countChecksum(char *buffer);
+void stud_Route_Init();
+void stud_route_add(stud_route_msg *proute);
+int stud_fwd_deal(char *pBuffer, int length);
+// implemented by students
+typedef struct node  {
+	unsigned int dstAddr;
+	unsigned int nextAddr;
+}Node;
+int number = 10;
+int id;
+//Node *rounterTable = (Node*)malloc(sizeof(Node) * number);
+Node rounterTable;
+void stud_Route_Init(){
+	//rounterTable.clear();
+	id = 0;
+	return;
+} 
+
+void stud_route_add(stud_route_msg *proute) {
+	printf("--------------------------add--------------------\n");
+	Node *p = NULL; 
+	p = &rounterTable;
+	(*p).dstAddr = ntohl(proute->dest);
+	(*p).nextAddr = ntohl(proute-> nexthop);
+	//rounterTable[id].dstAddr = ntohl(proute->dest);
+	//rounterTable[id].nextAddr = ntohl(proute-> nexthop);
+	id++;//
+	return;
 }
 
-/*
-	unsigned short sum =0;
-	unsigned short temp =0;
-	unsigned short checkSum =0;
-	for(int i=0;i<10;i++){
-	temp =((unsigned char)buffer[2*i]<<8)+(unsigned char)buffer[2*i+1];
-	if(0xffff - sum <temp){
-		sum = temp +1+sum;
-	}else{sum = sum+ temp;}
+int countChecksum(char *buffer){
+	int sum = 0;
+	int i;
+	for (i = 0;i<=(5*2-1)*2;i=i+2){
+		//printf("---front%d:%x\n",i,(unsigned char)(buffer[i] ));
+		//printf("---back%d:%x\n",i+1,(unsigned char)(buffer[i+1]));
+		sum = sum+((unsigned char)buffer[i]<<8)+(unsigned char)buffer[i+1];
+		//printf("当前sum:%x\n",sum);
 	}
-	checkSum = htons(0xffff-sum);
-	printf("checksum:%x\n",checkSum);
-	memcpy(buffer + 10, &checkSum, 2); 
-	memcpy(buffer + 20, pBuffer, len);//connet the fomal data
-	ip_SendtoLower(pBuffer,len+20);
-*/
+	if (sum >= 0xFFFF){
+		printf("yichu");
+		sum = (0xFFFF & sum) + (sum>>16);
+	}
+	return sum;
+}
+
+int stud_fwd_deal(char *pBuffer, int length) {
+	for(int j=0;j<number;j++){
+		printf("table_target: %x\n",rounterTable.nextAddr);
+	}
+	int version = pBuffer[0]>>4;
+	int headLength = pBuffer[0] &0xF;
+	int TTL = pBuffer[8];
+      int destAddress = ntohl(*(unsigned int*)(pBuffer + 16)); //unsigned is important 
+	printf("destAddress:%x\n",destAddress);
+	if (version != 4){  //Version==4
+      	ip_DiscardPkt(pBuffer, STUD_IP_TEST_VERSION_ERROR);  
+      	return 1;  
+    	}  
+	printf("version-----------\n");
+	if(TTL<=0){
+		ip_DiscardPkt(pBuffer, STUD_IP_TEST_TTL_ERROR); 
+		return 1;
+	}
+	if(headLength<5){
+		ip_DiscardPkt(pBuffer, STUD_IP_TEST_HEADLEN_ERROR); 
+		return 1;
+	}
+	printf("length-----------\n");
+	if(destAddress==getIpv4Address()){
+		fwd_LocalRcv(pBuffer,length); 
+		return 1;
+	}
+	
+	//use transmit
+	pBuffer[8] = TTL-1;	
+	int sum = countChecksum(pBuffer);
+	sum = ~sum & (0xffff);
+	printf("qufan_sum:%x\n",sum);
+	sum = (unsigned short)(sum);
+	sum = htons(sum);
+	printf("final_sum:%x\n",sum);
+	memcpy(pBuffer + 10, &sum, 2);
+	pBuffer[11] = pBuffer[11] & 0xff;
+	for(int i = 0;i<25;i++){
+		printf("%x ",(unsigned short)pBuffer[i]);
+	}
+	 
+	for(int i=0;i<32;i++){ 
+		unsigned int target = destAddress&(0xffffffff<<i);
+		printf("target: %x\n",target);
+		for(int j=0;j<number;j++){
+			//printf("table_target: %x\n",rounterTable[id].dstAddr);
+			if(target==(unsigned int)rounterTable.dstAddr){
+				printf("transmission");
+					for(int k = 0;k<25;k++){
+						printf("%x ",(unsigned short)pBuffer[k]);
+					}
+				fwd_SendtoLower(pBuffer,length,rounterTable.nextAddr); 
+				return 0;
+			}
+		} 
+	}
+	fwd_DiscardPkt(pBuffer,STUD_FORWARD_TEST_NOROUTE);
+	return 1;
+}
+
