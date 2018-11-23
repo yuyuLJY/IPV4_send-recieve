@@ -1,0 +1,95 @@
+/*
+* THIS FILE IS FOR IP TEST
+*/
+// system support
+#include "sysInclude.h"
+
+extern void ip_DiscardPkt(char* pBuffer,int type);
+
+extern void ip_SendtoLower(char*pBuffer,int length);
+
+extern void ip_SendtoUp(char *pBuffer,int length);
+extern void fwd_SendtoLower(char *pBuffer, int length, unsigned int nexthop); 
+extern unsigned int getIpv4Address();
+int countChecksum(char *buffer);
+void stud_Route_Init();
+void stud_route_add(stud_route_msg *proute);
+int stud_fwd_deal(char *pBuffer, int length);
+// implemented by students
+typedef struct node  {
+	int dstAddr;
+	int nextAddr;
+}Node;
+int number = 50;
+int id;
+Node *rounterTable = (Node*)malloc(sizeof(Node) * number);
+
+void stud_Route_Init(){
+	//rounterTable.clear();
+	id = 0;
+	return;
+} 
+
+void stud_route_add(stud_route_msg *proute) {
+	rounterTable[id].dstAddr = ntohl(proute->dest);
+	rounterTable[id].nextAddr = ntohl(proute-> nexthop);
+	id++;//
+	return;
+}
+
+int countChecksum(char *buffer){
+	int sum = 0;
+	int i;
+	for (i = 0;i<=(5*2-1)*2;i=i+2){
+		//printf("---front%d:%x\n",i,(unsigned char)(buffer[i] ));
+		//printf("---back%d:%x\n",i+1,(unsigned char)(buffer[i+1]));
+		sum = sum+((unsigned char)buffer[i]<<8)+(unsigned char)buffer[i+1];
+		printf("当前sum:%x\n",sum);
+	}
+	if (sum >= 0xFFFF){
+		printf("yichu");
+		sum = (0xFFFF & sum) + (sum>>16);
+	}
+	return sum;
+}
+
+int stud_fwd_deal(char *pBuffer, int length) {
+	int version = pBuffer[0]>>4;
+	int headLength = pBuffer[0] &0xF;
+	int TTL = pBuffer[8];
+      int destAddress = ntohl(*(unsigned int*)(pBuffer + 16)); //unsigned is important 
+	printf("destAddress:%x\n",destAddress);
+	if (version != 4){  //Version==4
+      	ip_DiscardPkt(pBuffer, STUD_IP_TEST_VERSION_ERROR);  
+      	return 1;  
+    	}  
+	printf("version-----------\n");
+	if(TTL<=0){
+		ip_DiscardPkt(pBuffer, STUD_IP_TEST_TTL_ERROR); 
+		return 1;
+	}
+	if(headLength<5){
+		ip_DiscardPkt(pBuffer, STUD_IP_TEST_HEADLEN_ERROR); 
+		return 1;
+	}
+	printf("length-----------\n");
+	if(destAddress==getIpv4Address()){
+		fwd_LocalRcv(pBuffer,length); 
+		return 1;
+	}
+	
+	//use transmit
+	pBuffer[8] = TTL-1;	
+	int new_checkSum = countChecksum(pBuffer);
+	for(int i=0;i<32;i++){ 
+		unsigned int target = destAddress&(0xffffffff<<i);
+		for(int j=0;j<number;j++){
+			if(target==rounterTable[id].dstAddr){
+				fwd_SendtoLower(pBuffer,length,rounterTable[id].nextAddr); 
+				return 0;
+			}
+		} 
+	}
+	fwd_DiscardPkt(pBuffer,STUD_FORWARD_TEST_NOROUTE);
+	return 1;
+}
