@@ -31,7 +31,7 @@ int countChecksum(char *buffer){
 }
 
 int stud_ip_recv(char *pBuffer,unsigned short length)
-{	printf("start-----------\n");
+{
 	int version = pBuffer[0]>>4;
 	int headLength = pBuffer[0] &0xF;
 	int TTL = pBuffer[8];
@@ -79,9 +79,7 @@ int stud_ip_recv(char *pBuffer,unsigned short length)
 int stud_ip_Upsend(char *pBuffer,unsigned short len,unsigned int srcAddr,
 				   unsigned int dstAddr,byte protocol,byte ttl)
 {	
-	//char buffer[len+20] ;
-	//buffer = {0};
-	char *buffer = (char *)malloc((20 + len) * sizeof(char));
+	char buffer[len+20] ;
 	memset(buffer, 0, len+20);
 
 	buffer[0] = 0x45;
@@ -91,32 +89,15 @@ int stud_ip_Upsend(char *pBuffer,unsigned short len,unsigned int srcAddr,
 	buffer[9] = protocol; //协议 
 	
 	unsigned int src = htonl(srcAddr);    
-      unsigned int dis = htonl(dstAddr);
+        unsigned int dis = htonl(dstAddr);
 	memcpy(buffer + 12, &src, 4);
 	memcpy(buffer + 16, &dis, 4); 
-	
-	//count checksum
-	//unsigned short checkSum = 0;   
-    	//unsigned short sum = 0;   	
-	int sum = 0;
-	int i;
-	for (i = 0;i<=(5*2-1)*2;i=i+2){
-		printf("---front%d:%x\n",i,(unsigned char)(buffer[i] ));
-		printf("---back%d:%x\n",i+1,(unsigned char)(buffer[i+1]));
-		sum = sum+((unsigned char)buffer[i]<<8)+(unsigned char)buffer[i+1];
-		printf("当前sum:%x\n",sum);
-	}
-	if (sum >= 0xFFFF){
-		printf("yichu");
-		sum = (0xFFFF & sum) + (sum>>16);
-	}
-	printf("yichuhou_sum:%x\n",sum);
+	 	
+	int sum = countChecksum(buffer);
 	sum = ~sum & (0xffff);
-	printf("qufan_sum:%x\n",sum);
 	sum = htons(sum);
-	printf("final_sum:%x\n",sum);
 	memcpy(buffer + 10, &sum, 2); 
 	memcpy(buffer + 20, pBuffer, len);//connet the fomal data
-	ip_SendtoLower(pBuffer,len+20);
+	ip_SendtoLower(buffer,len+20);
 	return 0;
 }
